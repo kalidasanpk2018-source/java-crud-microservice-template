@@ -35,10 +35,7 @@ import software.amazon.lambda.powertools.metrics.Metrics;
 import software.amazon.lambda.powertools.metrics.MetricsUtils;
 import software.amazon.lambda.powertools.tracing.Tracing;
 
-import javax.validation.*;
-import java.util.Date;
-import java.util.Set;
-import java.util.stream.Collectors;
+import javax.validation.ValidationException;
 
 /**
  * Lambda function for creating {@link Todo}
@@ -46,9 +43,6 @@ import java.util.stream.Collectors;
 public class CreateTodoFunction extends TodoRequestHandler {
 
     private static final Logger log = LogManager.getLogger();
-
-    private final ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-    private final Validator validator = factory.getValidator();
 
     private MetricsLogger metricsLogger = MetricsUtils.metricsLogger();
 
@@ -66,11 +60,11 @@ public class CreateTodoFunction extends TodoRequestHandler {
     public APIGatewayProxyResponseEvent handleRequest(final APIGatewayProxyRequestEvent event, final Context context) {
         try {
             Todo todo = mapper.readValue(event.getBody(), Todo.class);
-            validateTodo(todo);
+            validateOrThrow(todo);
 
             String id = event.getRequestContext().getRequestId();
             todo.setId(id);
-            todo.setCreatedAt(new Date().getTime());
+            todo.setCreatedAt(System.currentTimeMillis());
 
             dataAccess.create(todo);
 
@@ -95,12 +89,5 @@ public class CreateTodoFunction extends TodoRequestHandler {
             return error();
         }
 
-    }
-
-    private void validateTodo(Todo todo) {
-        Set<ConstraintViolation<Todo>> violations = validator.validate(todo);
-        if (!violations.isEmpty()) {
-            throw new ValidationException("Invalid Todo: " + violations.stream().map(ConstraintViolation::getMessage).collect(Collectors.joining(", ")));
-        }
     }
 }

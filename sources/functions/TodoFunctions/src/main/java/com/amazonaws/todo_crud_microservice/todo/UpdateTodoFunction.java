@@ -37,8 +37,6 @@ import software.amazon.lambda.powertools.metrics.MetricsUtils;
 import software.amazon.lambda.powertools.tracing.Tracing;
 
 import javax.validation.*;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Handler for requests to Lambda function.
@@ -48,9 +46,6 @@ public class UpdateTodoFunction extends TodoRequestHandler {
     private static final Logger log = LogManager.getLogger();
 
     private MetricsLogger metricsLogger = MetricsUtils.metricsLogger();
-
-    private final ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-    private final Validator validator = factory.getValidator();
 
     public UpdateTodoFunction() {
         super();
@@ -65,13 +60,16 @@ public class UpdateTodoFunction extends TodoRequestHandler {
     @Metrics
     public APIGatewayProxyResponseEvent handleRequest(final APIGatewayProxyRequestEvent event, final Context context) {
         try {
+            if (event.getPathParameters() == null) {
+                return badRequest("id is missing");
+            }
             String id = event.getPathParameters().get("id");
             if (StringUtils.isEmpty(id)) {
                 return badRequest("id is missing");
             }
 
             Todo todo = mapper.readValue(event.getBody(), Todo.class);
-            validateTodo(todo);
+            validateOrThrow(todo);
 
             Todo oldTodo = dataAccess.get(id);
             if (oldTodo == null) {
@@ -97,13 +95,6 @@ public class UpdateTodoFunction extends TodoRequestHandler {
         } catch (Exception e) {
             log.error("Internal Error", e);
             return error();
-        }
-    }
-
-    private void validateTodo(Todo todo) {
-        Set<ConstraintViolation<Todo>> violations = validator.validate(todo);
-        if (!violations.isEmpty()) {
-            throw new ValidationException("Invalid Todo: " + violations.stream().map(ConstraintViolation::getMessage).collect(Collectors.joining(", ")));
         }
     }
 }

@@ -94,8 +94,6 @@ public class TodoDynamoDataAccess implements DataAccess<Todo> {
 
     @Override
     public PaginatedList<Todo> list(String nextToken) {
-        ScanResponse total = ddb.scan(builder -> builder.tableName(DDB_TABLE).select(Select.COUNT));
-
         ScanRequest.Builder builder = ScanRequest.builder().tableName(DDB_TABLE).limit(PAGE_SIZE);
         if (nextToken != null) {
             Map<String, AttributeValue> start = new HashMap<>();
@@ -106,7 +104,7 @@ public class TodoDynamoDataAccess implements DataAccess<Todo> {
 
         return new PaginatedList<>(
                 response.items().stream().map(this::mapTodo).collect(Collectors.toList()),
-                total.count(),
+                response.count(),
                 response.hasLastEvaluatedKey() ? response.lastEvaluatedKey().get("id").s() : null
         );
     }

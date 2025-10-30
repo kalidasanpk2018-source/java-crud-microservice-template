@@ -51,7 +51,7 @@ public class ListTodosFunction extends TodoRequestHandler {
     @Logging
     @Tracing
     public APIGatewayProxyResponseEvent handleRequest(final APIGatewayProxyRequestEvent event, final Context context) {
-        String nextToken = event.getHeaders().get("X-next-token");
+        String nextToken = event.getHeaders() != null ? event.getHeaders().get("X-next-token") : null;
 
         try {
             PaginatedList<Todo> todos = dataAccess.list(nextToken);
