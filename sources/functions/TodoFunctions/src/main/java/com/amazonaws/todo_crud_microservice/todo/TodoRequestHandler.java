@@ -27,8 +27,11 @@ import com.amazonaws.todo_crud_microservice.todo.dataaccess.DataAccess;
 import com.amazonaws.todo_crud_microservice.todo.dataaccess.TodoDynamoDataAccess;
 import com.amazonaws.todo_crud_microservice.todo.model.Todo;
 
+import javax.validation.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public abstract class TodoRequestHandler implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
@@ -37,6 +40,8 @@ public abstract class TodoRequestHandler implements RequestHandler<APIGatewayPro
     protected final ObjectMapper mapper = new ObjectMapper();
 
     protected DataAccess<Todo> dataAccess;
+
+    private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
 
     public TodoRequestHandler() {
         this(new TodoDynamoDataAccess());
@@ -78,6 +83,13 @@ public abstract class TodoRequestHandler implements RequestHandler<APIGatewayPro
 
     protected APIGatewayProxyResponseEvent error() {
         return response().withStatusCode(500).withBody("{\"error\":\"Internal Server Error\", \"message\":\"Unexpected error\"}");
+    }
+
+    protected <T> void validateOrThrow(T obj) {
+        Set<ConstraintViolation<T>> violations = VALIDATOR.validate(obj);
+        if (!violations.isEmpty()) {
+            throw new ValidationException("Invalid Todo: " + violations.stream().map(ConstraintViolation::getMessage).collect(Collectors.joining(", ")));
+        }
     }
 
 }
