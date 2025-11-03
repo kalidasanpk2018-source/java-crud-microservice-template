@@ -94,8 +94,6 @@ public class TodoDynamoDataAccess implements DataAccess<Todo> {
 
     @Override
     public PaginatedList<Todo> list(String nextToken) {
-        ScanResponse total = ddb.scan(builder -> builder.tableName(DDB_TABLE).select(Select.COUNT));
-
         ScanRequest.Builder builder = ScanRequest.builder().tableName(DDB_TABLE).limit(PAGE_SIZE);
         if (nextToken != null) {
             Map<String, AttributeValue> start = new HashMap<>();
@@ -104,19 +102,50 @@ public class TodoDynamoDataAccess implements DataAccess<Todo> {
         }
         ScanResponse response = ddb.scan(builder.build());
 
+        int totalCount = response.count();
+        if (response.hasLastEvaluatedKey()) {
+            totalCount = -1;
+        }
+
         return new PaginatedList<>(
                 response.items().stream().map(this::mapTodo).collect(Collectors.toList()),
-                total.count(),
+                totalCount,
                 response.hasLastEvaluatedKey() ? response.lastEvaluatedKey().get("id").s() : null
         );
     }
 
     private Todo mapTodo(Map<String, AttributeValue> item) {
+        if (item == null) {
+            throw new IllegalArgumentException("Item cannot be null");
+        }
+        
+        AttributeValue idAttr = item.get("id");
+        AttributeValue createdAtAttr = item.get("createdAt");
+        AttributeValue taskAttr = item.get("task");
+        AttributeValue descriptionAttr = item.get("description");
+        AttributeValue completedAttr = item.get("completed");
+        
+        if (idAttr == null || idAttr.s() == null) {
+            throw new IllegalArgumentException("Item must have a valid 'id' attribute");
+        }
+        if (createdAtAttr == null || createdAtAttr.n() == null) {
+            throw new IllegalArgumentException("Item must have a valid 'createdAt' attribute");
+        }
+        if (taskAttr == null || taskAttr.s() == null) {
+            throw new IllegalArgumentException("Item must have a valid 'task' attribute");
+        }
+        if (descriptionAttr == null || descriptionAttr.s() == null) {
+            throw new IllegalArgumentException("Item must have a valid 'description' attribute");
+        }
+        if (completedAttr == null) {
+            throw new IllegalArgumentException("Item must have a valid 'completed' attribute");
+        }
+        
         return new Todo(
-                item.get("id").s(),
-                Long.parseLong(item.get("createdAt").n()),
-                item.get("task").s(),
-                item.get("description").s(),
-                item.get("completed").bool());
+                idAttr.s(),
+                Long.parseLong(createdAtAttr.n()),
+                taskAttr.s(),
+                descriptionAttr.s(),
+                completedAttr.bool());
     }
 }
