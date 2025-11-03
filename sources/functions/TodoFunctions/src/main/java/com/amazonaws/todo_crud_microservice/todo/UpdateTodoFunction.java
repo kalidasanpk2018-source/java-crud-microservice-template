@@ -65,6 +65,10 @@ public class UpdateTodoFunction extends TodoRequestHandler {
     @Metrics
     public APIGatewayProxyResponseEvent handleRequest(final APIGatewayProxyRequestEvent event, final Context context) {
         try {
+            if (event.getPathParameters() == null) {
+                return badRequest("path parameters are missing");
+            }
+            
             String id = event.getPathParameters().get("id");
             if (StringUtils.isEmpty(id)) {
                 return badRequest("id is missing");

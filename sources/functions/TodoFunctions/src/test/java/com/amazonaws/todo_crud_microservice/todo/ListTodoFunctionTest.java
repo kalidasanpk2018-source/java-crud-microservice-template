@@ -108,4 +108,28 @@ public class ListTodoFunctionTest extends TodoFunctionsTests {
         assertThat(response.getStatusCode()).isEqualTo(500);
         assertThat(response.getBody()).isEqualTo("{\"error\":\"Internal Server Error\", \"message\":\"Unexpected error\"}");
     }
+
+    @ParameterizedTest
+    @Event(value = "list_todos/events/ok.json", type = APIGatewayProxyRequestEvent.class)
+    public void testListTodosNullHeaders(APIGatewayProxyRequestEvent event) throws JsonProcessingException, JSONException {
+        event.setHeaders(null);
+        
+        Todo todo = new Todo();
+        todo.setCreatedAt(1621847956);
+        todo.setId(ID);
+        todo.setTask("Add tests");
+        todo.setDescription("Create Unit Tests");
+
+        List<Todo> items = Collections.singletonList(todo);
+        PaginatedList<Todo> todos = new PaginatedList<>(items, 3, null);
+
+        given(dataAccess.list(isNull())).willReturn(todos);
+
+        ListTodosFunction handler = new ListTodosFunction(dataAccess);
+        APIGatewayProxyResponseEvent result = handler.handleRequest(event, context);
+
+        assertThat(result.getStatusCode()).isEqualTo(200);
+        assertEquals(mapper.writeValueAsString(items), result.getBody(), JSONCompareMode.LENIENT);
+        verify(dataAccess).list(isNull());
+    }
 }

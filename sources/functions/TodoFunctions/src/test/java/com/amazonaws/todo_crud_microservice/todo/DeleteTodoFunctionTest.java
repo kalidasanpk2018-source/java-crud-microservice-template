@@ -68,4 +68,16 @@ public class DeleteTodoFunctionTest extends TodoFunctionsTests {
         assertThat(response.getStatusCode()).isEqualTo(500);
         assertThat(response.getBody()).isEqualTo("{\"error\":\"Internal Server Error\", \"message\":\"Unexpected error\"}");
     }
+
+    @ParameterizedTest
+    @Event(value = "delete_todo/events/ok.json", type = APIGatewayProxyRequestEvent.class)
+    public void testDeleteTodoNullPathParameters(APIGatewayProxyRequestEvent event) {
+        event.setPathParameters(null);
+        
+        DeleteTodoFunction handler = new DeleteTodoFunction(dataAccess);
+        APIGatewayProxyResponseEvent result = handler.handleRequest(event, context);
+
+        assertThat(result.getStatusCode()).isEqualTo(400);
+        assertThat(result.getBody()).isEqualTo("{\"error\":\"Bad request\", \"message\":\"path parameters are missing\"}");
+    }
 }

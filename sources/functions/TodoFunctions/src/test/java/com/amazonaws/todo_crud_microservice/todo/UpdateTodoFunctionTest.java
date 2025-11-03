@@ -115,4 +115,16 @@ public class UpdateTodoFunctionTest extends TodoFunctionsTests {
         assertThat(response.getStatusCode()).isEqualTo(500);
         assertThat(response.getBody()).isEqualTo("{\"error\":\"Internal Server Error\", \"message\":\"Unexpected error\"}");
     }
+
+    @ParameterizedTest
+    @Event(value = "update_todo/events/ok.json", type = APIGatewayProxyRequestEvent.class)
+    public void testUpdateTodoNullPathParameters(APIGatewayProxyRequestEvent event) {
+        event.setPathParameters(null);
+        
+        UpdateTodoFunction handler = new UpdateTodoFunction(dataAccess);
+        APIGatewayProxyResponseEvent result = handler.handleRequest(event, context);
+
+        assertThat(result.getStatusCode()).isEqualTo(400);
+        assertThat(result.getBody()).isEqualTo("{\"error\":\"Bad request\", \"message\":\"path parameters are missing\"}");
+    }
 }

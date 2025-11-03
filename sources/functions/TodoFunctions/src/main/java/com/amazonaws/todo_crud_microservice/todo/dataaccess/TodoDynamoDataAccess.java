@@ -46,8 +46,19 @@ public class TodoDynamoDataAccess implements DataAccess<Todo> {
 
     private static final String DDB_TABLE = System.getenv("TABLE_NAME");
     private static final String PAGE_SIZE_STR = System.getenv("PAGE_SIZE");
-    private static final Integer PAGE_SIZE = PAGE_SIZE_STR != null ? Integer.parseInt(PAGE_SIZE_STR) : 10;
+    private static final Integer PAGE_SIZE = parsePageSize(PAGE_SIZE_STR);
     private static final String LOCAL = System.getenv("AWS_SAM_LOCAL");
+    
+    private static Integer parsePageSize(String pageSizeStr) {
+        if (pageSizeStr == null || pageSizeStr.trim().isEmpty()) {
+            return 10;
+        }
+        try {
+            return Integer.parseInt(pageSizeStr);
+        } catch (NumberFormatException e) {
+            return 10;
+        }
+    }
 
     private static final DynamoDbClient ddb;
 
@@ -94,29 +105,72 @@ public class TodoDynamoDataAccess implements DataAccess<Todo> {
 
     @Override
     public PaginatedList<Todo> list(String nextToken) {
-        ScanResponse total = ddb.scan(builder -> builder.tableName(DDB_TABLE).select(Select.COUNT));
-
-        ScanRequest.Builder builder = ScanRequest.builder().tableName(DDB_TABLE).limit(PAGE_SIZE);
-        if (nextToken != null) {
+        ScanRequest.Builder builder = ScanRequest.builder()
+                .tableName(DDB_TABLE)
+                .limit(PAGE_SIZE);
+        
+        if (nextToken != null && !nextToken.trim().isEmpty()) {
             Map<String, AttributeValue> start = new HashMap<>();
             start.put("id", AttributeValue.builder().s(nextToken).build());
             builder.exclusiveStartKey(start);
         }
+        
         ScanResponse response = ddb.scan(builder.build());
+        
+        String nextPageToken = null;
+        if (response.hasLastEvaluatedKey() && response.lastEvaluatedKey().containsKey("id")) {
+            AttributeValue idAttr = response.lastEvaluatedKey().get("id");
+            if (idAttr != null && idAttr.s() != null) {
+                nextPageToken = idAttr.s();
+            }
+        }
 
         return new PaginatedList<>(
                 response.items().stream().map(this::mapTodo).collect(Collectors.toList()),
-                total.count(),
-                response.hasLastEvaluatedKey() ? response.lastEvaluatedKey().get("id").s() : null
+                response.count(),
+                nextPageToken
         );
     }
 
     private Todo mapTodo(Map<String, AttributeValue> item) {
+        if (item == null) {
+            throw new IllegalArgumentException("Item cannot be null");
+        }
+        
+        AttributeValue idAttr = item.get("id");
+        AttributeValue createdAtAttr = item.get("createdAt");
+        AttributeValue taskAttr = item.get("task");
+        AttributeValue descriptionAttr = item.get("description");
+        AttributeValue completedAttr = item.get("completed");
+        
+        if (idAttr == null || idAttr.s() == null) {
+            throw new IllegalArgumentException("Item must have an 'id' attribute");
+        }
+        if (createdAtAttr == null || createdAtAttr.n() == null) {
+            throw new IllegalArgumentException("Item must have a 'createdAt' attribute");
+        }
+        if (taskAttr == null || taskAttr.s() == null) {
+            throw new IllegalArgumentException("Item must have a 'task' attribute");
+        }
+        if (descriptionAttr == null || descriptionAttr.s() == null) {
+            throw new IllegalArgumentException("Item must have a 'description' attribute");
+        }
+        if (completedAttr == null) {
+            throw new IllegalArgumentException("Item must have a 'completed' attribute");
+        }
+        
+        long createdAt;
+        try {
+            createdAt = Long.parseLong(createdAtAttr.n());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid 'createdAt' value: " + createdAtAttr.n(), e);
+        }
+        
         return new Todo(
-                item.get("id").s(),
-                Long.parseLong(item.get("createdAt").n()),
-                item.get("task").s(),
-                item.get("description").s(),
-                item.get("completed").bool());
+                idAttr.s(),
+                createdAt,
+                taskAttr.s(),
+                descriptionAttr.s(),
+                completedAttr.bool());
     }
 }
